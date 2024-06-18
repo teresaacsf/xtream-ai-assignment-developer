@@ -1,10 +1,31 @@
 from flask import Flask, request, jsonify, render_template
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 import joblib
 import pandas as pd
 import numpy as np
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG)
+
+# Initialize Flask app
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///observability.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# Define the Log model
+class APILog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    endpoint = db.Column(db.String(50), nullable=False)
+    method = db.Column(db.String(10), nullable=False)
+    request_data = db.Column(db.Text, nullable=False)
+    response_data = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Load models and preprocessing objects
 model_linear = joblib.load('models/model_linear_model.joblib')
@@ -42,8 +63,6 @@ def preprocess_input(data, scaler, feature_names, poly=None):
     
     return df_scaled, df_scaled
 
-app = Flask(__name__)
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -52,6 +71,16 @@ def index():
 def handle_error(e):
     response = {'error': str(e)}
     return jsonify(response), 500
+
+def log_request_response(endpoint, method, request_data, response_data):
+    log = APILog(
+        endpoint=endpoint,
+        method=method,
+        request_data=str(request_data),
+        response_data=str(response_data)
+    )
+    db.session.add(log)
+    db.session.commit()
 
 @app.route('/predict', methods=['POST'])
 def predict_price():
@@ -95,14 +124,17 @@ def predict_price():
             'xgboost_prediction': float(pred_xgboost[0])
         }
 
+        log_request_response('/predict', 'POST', data, response)
         return jsonify(response)
 
     except ValueError as ve:
         logging.exception("ValueError in prediction")
+        log_request_response('/predict', 'POST', data, {'error': str(ve)})
         return jsonify({'error': str(ve)}), 400
 
     except Exception as e:
         logging.exception("Unexpected error")
+        log_request_response('/predict', 'POST', data, {'error': 'Internal server error'})
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/similar_samples', methods=['POST'])
@@ -129,14 +161,17 @@ def get_similar_samples():
         closest_weight = similar_df.iloc[(similar_df['carat'] - carat).abs().argsort()[:n_samples]]
         similar_samples = closest_weight.to_dict(orient='records')
 
+        log_request_response('/similar_samples', 'POST', data, similar_samples)
         return jsonify(similar_samples)
 
     except ValueError as ve:
         logging.exception("ValueError in similar samples")
+        log_request_response('/similar_samples', 'POST', data, {'error': str(ve)})
         return jsonify({'error': str(ve)}), 400
 
     except Exception as e:
         logging.exception("Unexpected error")
+        log_request_response('/similar_samples', 'POST', data, {'error': 'Internal server error'})
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
