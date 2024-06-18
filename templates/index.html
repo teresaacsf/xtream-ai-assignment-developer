@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diamond Price Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+            margin-left: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Diamond Price Prediction</h2>
+    <div class="section">
+        <form id="diamondForm">
+            <label for="carat">Carat:</label>
+            <input type="text" id="carat" name="carat" placeholder="Enter carat value (e.g., 1.5)" required>
+
+            <label for="cut">Cut:</label>
+            <select id="cut" name="cut">
+                <option value="Ideal">Ideal</option>
+                <option value="Premium">Premium</option>
+                <option value="Very Good">Very Good</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+            </select>
+
+            <label for="color">Color:</label>
+            <select id="color" name="color">
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+                <option value="G">G</option>
+                <option value="H">H</option>
+                <option value="I">I</option>
+                <option value="J">J</option>
+            </select>
+
+            <label for="clarity">Clarity:</label>
+            <select id="clarity" name="clarity">
+                <option value="IF">IF</option>
+                <option value="VVS1">VVS1</option>
+                <option value="VVS2">VVS2</option>
+                <option value="VS1">VS1</option>
+                <option value="VS2">VS2</option>
+                <option value="SI1">SI1</option>
+                <option value="SI2">SI2</option>
+                <option value="I1">I1</option>
+            </select>
+
+            <label for="n_samples">Number of Similar Samples:</label>
+            <input type="text" id="n_samples" name="n_samples" placeholder="Enter number of samples (e.g., 5)">
+
+            <button type="button" onclick="predictPrice()">Predict Price</button>
+            <button type="button" onclick="findSimilarSamples()">Find Similar Diamonds</button>
+        </form>
+
+        <div id="predictionResult" style="margin-top: 20px; display: none;">
+            <h3>Prediction Result</h3>
+            <p id="linearPrediction"></p>
+            <p id="xgboostPrediction"></p>
+        </div>
+
+        <div id="similarSamplesResult" style="margin-top: 20px; display: none;">
+            <h3>Similar Diamond Samples</h3>
+            <ul id="similarSamplesList"></ul>
+        </div>
+    </div>
+
+    <script>
+        function predictPrice() {
+            let formData = {
+                carat: document.getElementById("carat").value,
+                cut: document.getElementById("cut").value,
+                color: document.getElementById("color").value,
+                clarity: document.getElementById("clarity").value
+            };
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.linear_regression_prediction !== undefined && data.xgboost_prediction !== undefined) {
+                        document.getElementById("linearPrediction").textContent = `Linear Regression Prediction: $${data.linear_regression_prediction.toFixed(2)}`;
+                        document.getElementById("xgboostPrediction").textContent = `XGBoost Prediction: $${data.xgboost_prediction.toFixed(2)}`;
+                        document.getElementById("predictionResult").style.display = "block";
+                    } else {
+                        throw new Error('Invalid response format from server');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function findSimilarSamples() {
+            let formData = {
+                carat: document.getElementById("carat").value,
+                cut: document.getElementById("cut").value,
+                color: document.getElementById("color").value,
+                clarity: document.getElementById("clarity").value,
+                n_samples: document.getElementById("n_samples").value
+            };
+
+            fetch('/similar_samples', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        let list = document.getElementById("similarSamplesList");
+                        list.innerHTML = "";
+                        data.forEach(sample => {
+                            let listItem = document.createElement("li");
+                            listItem.textContent = `Carat: ${sample.carat}, Cut: ${sample.cut}, Color: ${sample.color}, Clarity: ${sample.clarity}, Price: ${sample.price}`;
+                            list.appendChild(listItem);
+                        });
+                        document.getElementById("similarSamplesResult").style.display = "block";
+                    } else {
+                        throw new Error('Invalid response format from server');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+</body>
+
+</html>
