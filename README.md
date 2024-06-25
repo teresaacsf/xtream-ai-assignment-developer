@@ -68,4 +68,29 @@ Observability is key. Save every request and response made to the APIs to a **pr
 ---
 
 ## How to run
-Please fill this section as part of the assignment.
+
+Clone the repository:
+
+git clone https://github.com/teresaacsf/xtream-ai-assignment-developer.git
+cd xtream-ai-assignment-developer
+
+Install the dependencies:
+
+pip install -r requirements.txt
+
+Run database migrations:
+
+flask db init
+flask db migrate
+flask db upgrade
+
+Run the pipeline to train and save models:
+
+python pipeline.py
+
+Start the Flask application:
+
+python app.py
+
+Frontend
+Open your web browser and navigate to http://127.0.0.1:5000 to access the frontend.
